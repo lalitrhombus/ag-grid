@@ -1,5 +1,6 @@
-import React, {Component} from 'react';
+import React, { useState } from 'react';
 import SimpleCellRenderer from './simpleCellRenderer.jsx';
+import DropDownCellRenderer from './dropDownCellRenderer.jsx';
 import {AgGridReact} from '@ag-grid-community/react';
 
 // for community features
@@ -8,65 +9,130 @@ import {AllModules} from "@ag-grid-enterprise/all-modules";
 // for enterprise features
 // import {AllModules} from "@ag-grid-enterprise/all-modules";
 
-export default class MyApp extends Component {
+const Grid = () => {
 
-    constructor() {
-        super();
-
-        this.createColumnNames();
-
-        this.state = {
-            columnDefs: this.createColumnDefs(),
-            rowData: this.createRowData()
-        };
-    }
-
-    createColumnNames() {
-        // creates column names by iterating the alphabet twice, eg {'aa','ab','ac',.....'zz'}
-        const alphabet = 'abcdefghijklmnopqrstuvwxyz'.split('');
-        this.columnNames = [];
-        alphabet.forEach(letter1 => {
-            alphabet.forEach(letter2 => {
-                this.columnNames.push(letter1 + letter2);
-            });
-        });
-    }
-
-    createRowData() {
-        const rowData = [];
-
-        for (let i = 0; i < 1000; i++) {
-            const item = {};
-            this.columnNames.forEach(colName => {
-                item[colName] = '(' + colName.toUpperCase() + ',' + i + ')'
-            });
-            rowData.push(item);
+    const [gridApi, setGridApi] = useState(null);
+    const [gridColumnApi, setGridColumnApi] = useState(null);
+    const [rowData, setRowData] = useState(null);
+    const [columnDefs, setColumnDefs] = useState(null);
+  
+    const onGridReady = (params) => {
+      setGridApi(params.api);
+      setGridColumnApi(params.columnApi);
+  
+      const httpRequest = new XMLHttpRequest();
+      const updateData = (data) => {
+        setColumnDefs(createColumnDefs(Object.keys(data[0])));
+        setRowData(data);
+      };
+  
+      httpRequest.open(
+        'GET',
+        'https://raw.githubusercontent.com/ag-grid/ag-grid/master/grid-packages/ag-grid-docs/src/olympicWinnersSmall.json'
+      );
+      httpRequest.send();
+      httpRequest.onreadystatechange = () => {
+        if (httpRequest.readyState === 4 && httpRequest.status === 200) {
+          updateData(JSON.parse(httpRequest.responseText));
         }
+      };
+    };
 
-        return rowData;
-    }
+    const getContextMenuItems = (params) => {
+        var result = [
+          {
+            name: 'Alert ' + params.value,
+            action: function () {
+              window.alert('Alerting about ' + params.value);
+            },
+            cssClasses: ['redFont', 'bold'],
+          },
+          {
+            name: 'Always Disabled',
+            disabled: true,
+            tooltip:
+              'Very long tooltip, did I mention that I am very long, well I am! Long!  Very Long!',
+          },
+          'separator',
+          {
+            name: 'Checked',
+            checked: true,
+            action: function () {
+              console.log('Checked Selected');
+            },
+            icon: '<img src="../images/skills/mac.png"/>',
+          },
+          'copy',
+          'separator',
+          'chartRange',
+        ];
+        return result;
+    };
 
-    createColumnDefs() {
+    const createColumnDefs = (columnNames) => {
         const columnDefs = [];
 
-        this.columnNames.forEach(colName => {
-            columnDefs.push({
+        columnNames.forEach((colName, i) => {
+            const columnDef = {
                 headerName: colName.toUpperCase(),
                 field: colName,
                 cellRendererFramework: SimpleCellRenderer,
-                width: 100
-            });
+                width: 100,
+                filter: "agTextColumnFilter"
+            };
+
+            if(i==2){
+                columnDef.pinned = 'right';
+                columnDef.cellRendererFramework = DropDownCellRenderer;
+            }
+            columnDefs.push(columnDef);
         });
 
         return columnDefs;
     }
 
-    render() {
+    const onbtnClick = ()=>{
+        gridApi.exportDataAsExcel();
+    }
         return (
             <div style={{height: '100%'}} className="ag-theme-balham">
-                <AgGridReact columnDefs={this.state.columnDefs} rowData={this.state.rowData} modules={AllModules}/>
+                <button onClick={onbtnClick}>Download</button>
+                <AgGridReact 
+                    toolPanel='columns' 
+                    onGridReady={onGridReady}
+                    rowData={rowData}
+                    columnDefs={columnDefs}
+                    sideBar={{
+                        toolPanels: [
+                          {
+                            id: 'columns',
+                            labelDefault: 'Columns',
+                            labelKey: 'columns',
+                            iconKey: 'columns',
+                            toolPanel: 'agColumnsToolPanel',
+                          }
+                        ],
+                    }}
+                    defaultColDef={{
+                        flex: 1,
+                        minWidth: 100,
+                        enableValue: true,
+                        enableRowGroup: true,
+                        enablePivot: true,
+                        sortable: true,
+                        filter: true,
+                        floatingFilter: true,
+                    }}
+                    allowContextMenuWithControlKey={true}
+                    getContextMenuItems={getContextMenuItems}                    
+                    modules={
+                        AllModules
+                    }
+                />
             </div>
         );
-    }
 
 }
+
+
+export default Grid;
